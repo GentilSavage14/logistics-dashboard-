@@ -6,14 +6,18 @@ import Customers from './components/Customers';
 import Vehicles from './components/Vehicles';
 import Analytics from './components/Analytics';
 import Settings from './components/Settings';
+import Login from './components/Login';
 import { supabase } from './supabaseClient';
+import { LogOut } from 'lucide-react';
 
 export default function App() {
+  const [session, setSession] = useState(null);
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Search & Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('All');
 
@@ -25,9 +29,30 @@ export default function App() {
     status: 'Pending'
   });
 
+  // Auth Listener
   useEffect(() => {
-    fetchShipments();
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setCheckingAuth(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (session) {
+      fetchShipments();
+    }
+  }, [session]);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setSession(null);
+  };
 
   const fetchShipments = async () => {
     setLoading(true);
@@ -54,7 +79,6 @@ export default function App() {
     }
   };
 
-  // Toggle Shipment Status between Pending and Delivered
   const handleUpdateStatus = async (id, currentStatus) => {
     const newStatus = currentStatus === 'Delivered' ? 'Pending' : 'Delivered';
 
@@ -70,7 +94,6 @@ export default function App() {
     }
   };
 
-  // Delete Shipment
   const handleDeleteShipment = async (id) => {
     if (!window.confirm(`Are you sure you want to delete shipment ${id}?`)) return;
 
@@ -86,7 +109,6 @@ export default function App() {
     }
   };
 
-  // Filtered shipments logic
   const filteredShipments = shipments.filter((s) => {
     const matchesSearch =
       (s.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -101,7 +123,6 @@ export default function App() {
     return matchesSearch && matchesStatus;
   });
 
-  // CSV Export Handler
   const downloadCSV = () => {
     if (filteredShipments.length === 0) {
       alert('No shipment data available to export.');
@@ -130,21 +151,41 @@ export default function App() {
     document.body.removeChild(link);
   };
 
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-white">
+        Loading system auth...
+      </div>
+    );
+  }
+
+  // If not logged in, render Login page
+  if (!session) {
+    return <Login onLoginSuccess={(sess) => setSession(sess)} />;
+  }
+
   const renderTabContent = () => {
     const tab = activeTab.toLowerCase();
 
     if (tab === 'dashboard' || tab === 'shipments') {
       return (
         <div className="space-y-6">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-800">{activeTab}</h2>
-            <p className="text-gray-500">Manage your operations and tracking tools.</p>
+          <div className="flex justify-between items-center">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-800">{activeTab}</h2>
+              <p className="text-gray-500">Manage your operations and tracking tools.</p>
+            </div>
+            <button
+              onClick={handleLogout}
+              className="bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-red-600 text-xs font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5"
+            >
+              <LogOut className="w-3.5 h-3.5" /> Sign Out
+            </button>
           </div>
 
           <KPICards shipments={shipments} />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Shipments Table Section */}
             <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <h3 className="font-bold text-gray-800">Shipments List</h3>
@@ -156,7 +197,6 @@ export default function App() {
                 </button>
               </div>
 
-              {/* SEARCH & FILTER CONTROLS */}
               <div className="flex flex-col sm:flex-row gap-2 mb-4">
                 <input
                   type="text"
@@ -237,7 +277,6 @@ export default function App() {
               )}
             </div>
 
-            {/* Add Shipment Form */}
             <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
               <h3 className="font-bold text-gray-800 mb-4">Add New Shipment</h3>
               <form onSubmit={handleAddShipment} className="space-y-3">
