@@ -12,6 +12,11 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('Dashboard');
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Search & Filter state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+
   const [formData, setFormData] = useState({
     id: '',
     item: '',
@@ -49,30 +54,73 @@ export default function App() {
     }
   };
 
+  // Toggle Shipment Status between Pending and Delivered
+  const handleUpdateStatus = async (id, currentStatus) => {
+    const newStatus = currentStatus === 'Delivered' ? 'Pending' : 'Delivered';
+
+    const { error } = await supabase
+      .from('shipments')
+      .update({ status: newStatus })
+      .eq('id', id);
+
+    if (error) {
+      alert('Error updating status: ' + error.message);
+    } else {
+      fetchShipments();
+    }
+  };
+
+  // Delete Shipment
+  const handleDeleteShipment = async (id) => {
+    if (!window.confirm(`Are you sure you want to delete shipment ${id}?`)) return;
+
+    const { error } = await supabase
+      .from('shipments')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      alert('Error deleting shipment: ' + error.message);
+    } else {
+      fetchShipments();
+    }
+  };
+
+  // Filtered shipments logic
+  const filteredShipments = shipments.filter((s) => {
+    const matchesSearch =
+      (s.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.item || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.origin || '').toLowerCase().includes(searchTerm.toLowerCase());
+
+    const matchesStatus =
+      statusFilter === 'All' ||
+      (statusFilter === 'Pending' && (s.status || '').toLowerCase().includes('pending')) ||
+      (statusFilter === 'Delivered' && (s.status || '').toLowerCase() === 'delivered');
+
+    return matchesSearch && matchesStatus;
+  });
+
   // CSV Export Handler
   const downloadCSV = () => {
-    if (shipments.length === 0) {
+    if (filteredShipments.length === 0) {
       alert('No shipment data available to export.');
       return;
     }
 
-    // CSV Headers
     const headers = ['Tracking ID', 'Item', 'Origin', 'Status'];
 
-    // Map rows
-    const rows = shipments.map((s) => [
+    const rows = filteredShipments.map((s) => [
       `"${s.id || ''}"`,
       `"${s.item || ''}"`,
       `"${s.origin || ''}"`,
       `"${s.status || 'Pending'}"`
     ]);
 
-    // Build CSV string
     const csvContent =
       'data:text/csv;charset=utf-8,' +
       [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
 
-    // Create hidden link and trigger download
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
@@ -93,19 +141,39 @@ export default function App() {
             <p className="text-gray-500">Manage your operations and tracking tools.</p>
           </div>
 
-          <KPICards />
+          <KPICards shipments={shipments} />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Shipments Table */}
+            {/* Shipments Table Section */}
             <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-              <div className="flex justify-between items-center mb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                 <h3 className="font-bold text-gray-800">Shipments List</h3>
                 <button
                   onClick={downloadCSV}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow-sm flex items-center gap-1"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow-sm flex items-center justify-center gap-1"
                 >
                   📥 Export CSV
                 </button>
+              </div>
+
+              {/* SEARCH & FILTER CONTROLS */}
+              <div className="flex flex-col sm:flex-row gap-2 mb-4">
+                <input
+                  type="text"
+                  placeholder="🔍 Search ID, item, or origin..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="flex-1 p-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="p-2 text-sm border rounded-lg bg-gray-50 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="All">All Statuses</option>
+                  <option value="Pending">Pending Only</option>
+                  <option value="Delivered">Delivered Only</option>
+                </select>
               </div>
 
               {loading ? (
@@ -119,17 +187,18 @@ export default function App() {
                         <th className="p-3">Item</th>
                         <th className="p-3">Origin</th>
                         <th className="p-3">Status</th>
+                        <th className="p-3 text-right">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {shipments.length === 0 ? (
+                      {filteredShipments.length === 0 ? (
                         <tr>
-                          <td colSpan="4" className="p-4 text-center text-gray-400">
-                            No shipments found.
+                          <td colSpan="5" className="p-4 text-center text-gray-400">
+                            No matching shipments found.
                           </td>
                         </tr>
                       ) : (
-                        shipments.map((s) => (
+                        filteredShipments.map((s) => (
                           <tr key={s.id} className="border-b hover:bg-gray-50">
                             <td className="p-3 font-semibold text-gray-800">{s.id}</td>
                             <td className="p-3 text-gray-600">{s.item}</td>
@@ -144,6 +213,20 @@ export default function App() {
                               >
                                 {s.status || 'Pending'}
                               </span>
+                            </td>
+                            <td className="p-3 text-right space-x-2">
+                              <button
+                                onClick={() => handleUpdateStatus(s.id, s.status)}
+                                className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded transition"
+                              >
+                                {s.status === 'Delivered' ? 'Mark Pending' : 'Mark Delivered'}
+                              </button>
+                              <button
+                                onClick={() => handleDeleteShipment(s.id)}
+                                className="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-2 py-1 rounded transition"
+                              >
+                                Delete
+                              </button>
                             </td>
                           </tr>
                         ))

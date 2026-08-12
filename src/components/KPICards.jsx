@@ -3,7 +3,9 @@ import { Package, Clock, CheckCircle2, DollarSign } from 'lucide-react';
 
 export default function KPICards({ shipments = [] }) {
   const totalShipments = shipments.length;
-  const pending = shipments.filter(s => s.status?.toLowerCase() === 'pending').length;
+  // Catches "Pending", "Pending Pickup", "pending", etc.
+  const pending = shipments.filter(s => s.status?.toLowerCase().includes('pending')).length;
+  // Catches "Delivered" or "delivered"
   const delivered = shipments.filter(s => s.status?.toLowerCase() === 'delivered').length;
   const totalRevenue = shipments.reduce((acc, curr) => acc + (Number(curr.cost) || 0), 0);
 
