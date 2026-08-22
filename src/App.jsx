@@ -8,13 +8,15 @@ import Analytics from './components/Analytics';
 import Settings from './components/Settings';
 import Login from './components/Login';
 import { supabase } from './supabaseClient';
-import { LogOut } from 'lucide-react';
+import { LogOut, Menu } from 'lucide-react';
 
 export default function App() {
   const [session, setSession] = useState(null);
   const [checkingAuth, setCheckingAuth] = useState(true);
 
   const [activeTab, setActiveTab] = useState('Dashboard');
+  const [darkMode, setDarkMode] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -29,7 +31,6 @@ export default function App() {
     status: 'Pending'
   });
 
-  // Auth Listener
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -159,10 +160,13 @@ export default function App() {
     );
   }
 
-  // If not logged in, render Login page
   if (!session) {
     return <Login onLoginSuccess={(sess) => setSession(sess)} />;
   }
+
+  const cardBg = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-100 text-gray-800';
+  const subText = darkMode ? 'text-slate-400' : 'text-gray-500';
+  const inputBg = darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-gray-200 text-gray-800';
 
   const renderTabContent = () => {
     const tab = activeTab.toLowerCase();
@@ -172,23 +176,23 @@ export default function App() {
         <div className="space-y-6">
           <div className="flex justify-between items-center">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">{activeTab}</h2>
-              <p className="text-gray-500">Manage your operations and tracking tools.</p>
+              <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>{activeTab}</h2>
+              <p className={subText}>Manage your operations and tracking tools.</p>
             </div>
             <button
               onClick={handleLogout}
-              className="bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-red-600 text-xs font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5"
+              className={`${darkMode ? 'bg-slate-800 hover:bg-red-900/40 text-slate-300 hover:text-red-400' : 'bg-gray-100 hover:bg-red-50 text-gray-600 hover:text-red-600'} text-xs font-semibold px-3 py-2 rounded-lg transition flex items-center gap-1.5`}
             >
               <LogOut className="w-3.5 h-3.5" /> Sign Out
             </button>
           </div>
 
-          <KPICards shipments={shipments} />
+          <KPICards shipments={shipments} darkMode={darkMode} />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+            <div className={`lg:col-span-2 p-5 rounded-xl border shadow-sm ${cardBg}`}>
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                <h3 className="font-bold text-gray-800">Shipments List</h3>
+                <h3 className="font-bold">Shipments List</h3>
                 <button
                   onClick={downloadCSV}
                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow-sm flex items-center justify-center gap-1"
@@ -203,12 +207,12 @@ export default function App() {
                   placeholder="🔍 Search ID, item, or origin..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="flex-1 p-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className={`flex-1 p-2 text-sm border rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 ${inputBg}`}
                 />
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="p-2 text-sm border rounded-lg bg-gray-50 text-gray-700 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className={`p-2 text-sm border rounded-lg font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500 ${inputBg}`}
                 >
                   <option value="All">All Statuses</option>
                   <option value="Pending">Pending Only</option>
@@ -217,12 +221,12 @@ export default function App() {
               </div>
 
               {loading ? (
-                <p className="text-gray-400 text-sm">Loading shipments...</p>
+                <p className={`${subText} text-sm`}>Loading shipments...</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
-                      <tr className="border-b bg-gray-50 text-gray-500">
+                      <tr className={`border-b ${darkMode ? 'bg-slate-700/50 text-slate-300 border-slate-700' : 'bg-gray-50 text-gray-500 border-gray-100'}`}>
                         <th className="p-3">Tracking ID</th>
                         <th className="p-3">Item</th>
                         <th className="p-3">Origin</th>
@@ -233,16 +237,16 @@ export default function App() {
                     <tbody>
                       {filteredShipments.length === 0 ? (
                         <tr>
-                          <td colSpan="5" className="p-4 text-center text-gray-400">
+                          <td colSpan="5" className={`p-4 text-center ${subText}`}>
                             No matching shipments found.
                           </td>
                         </tr>
                       ) : (
                         filteredShipments.map((s) => (
-                          <tr key={s.id} className="border-b hover:bg-gray-50">
-                            <td className="p-3 font-semibold text-gray-800">{s.id}</td>
-                            <td className="p-3 text-gray-600">{s.item}</td>
-                            <td className="p-3 text-gray-500">{s.origin}</td>
+                          <tr key={s.id} className={`border-b ${darkMode ? 'border-slate-700 hover:bg-slate-700/30' : 'border-gray-100 hover:bg-gray-50'}`}>
+                            <td className="p-3 font-semibold">{s.id}</td>
+                            <td className="p-3">{s.item}</td>
+                            <td className={`p-3 ${subText}`}>{s.origin}</td>
                             <td className="p-3">
                               <span
                                 className={`px-2 py-1 text-xs rounded-full font-medium ${
@@ -257,7 +261,7 @@ export default function App() {
                             <td className="p-3 text-right space-x-2">
                               <button
                                 onClick={() => handleUpdateStatus(s.id, s.status)}
-                                className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded transition"
+                                className={`text-xs px-2 py-1 rounded transition ${darkMode ? 'bg-slate-700 text-slate-200 hover:bg-slate-600' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}`}
                               >
                                 {s.status === 'Delivered' ? 'Mark Pending' : 'Mark Delivered'}
                               </button>
@@ -277,15 +281,15 @@ export default function App() {
               )}
             </div>
 
-            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-              <h3 className="font-bold text-gray-800 mb-4">Add New Shipment</h3>
+            <div className={`p-5 rounded-xl border shadow-sm ${cardBg}`}>
+              <h3 className="font-bold mb-4">Add New Shipment</h3>
               <form onSubmit={handleAddShipment} className="space-y-3">
                 <input
                   type="text"
                   placeholder="Tracking ID (e.g. SHP-106)*"
                   value={formData.id}
                   onChange={(e) => setFormData({ ...formData, id: e.target.value })}
-                  className="w-full p-2 border rounded-lg text-sm"
+                  className={`w-full p-2 border rounded-lg text-sm ${inputBg}`}
                   required
                 />
                 <input
@@ -293,7 +297,7 @@ export default function App() {
                   placeholder="Item Name*"
                   value={formData.item}
                   onChange={(e) => setFormData({ ...formData, item: e.target.value })}
-                  className="w-full p-2 border rounded-lg text-sm"
+                  className={`w-full p-2 border rounded-lg text-sm ${inputBg}`}
                   required
                 />
                 <input
@@ -301,7 +305,7 @@ export default function App() {
                   placeholder="Origin"
                   value={formData.origin}
                   onChange={(e) => setFormData({ ...formData, origin: e.target.value })}
-                  className="w-full p-2 border rounded-lg text-sm"
+                  className={`w-full p-2 border rounded-lg text-sm ${inputBg}`}
                 />
                 <button
                   type="submit"
@@ -316,19 +320,39 @@ export default function App() {
       );
     }
 
-    if (tab === 'invoices') return <Invoices />;
-    if (tab === 'customers') return <Customers />;
-    if (tab === 'vehicles') return <Vehicles />;
-    if (tab === 'analytics') return <Analytics />;
-    if (tab === 'settings') return <Settings />;
+    if (tab === 'invoices') return <Invoices darkMode={darkMode} />;
+    if (tab === 'customers') return <Customers darkMode={darkMode} />;
+    if (tab === 'vehicles') return <Vehicles darkMode={darkMode} />;
+    if (tab === 'analytics') return <Analytics darkMode={darkMode} />;
+    if (tab === 'settings') return <Settings darkMode={darkMode} setDarkMode={setDarkMode} />;
 
     return null;
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans">
-      <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
-      <main className="flex-1 overflow-y-auto p-6">{renderTabContent()}</main>
+    <div className={`flex min-h-screen font-sans transition-colors duration-300 ${darkMode ? 'bg-slate-950 text-slate-100' : 'bg-gray-50 text-gray-900'}`}>
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        darkMode={darkMode} 
+        setDarkMode={setDarkMode}
+        mobileOpen={mobileOpen}
+        setMobileOpen={setMobileOpen}
+      />
+      <main className="flex-1 overflow-y-auto p-4 md:p-6 w-full">
+        {/* Mobile Header Bar with Menu Button */}
+        <div className="flex items-center justify-between pb-3 mb-4 border-b border-gray-200 dark:border-slate-800 md:hidden">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="p-2 rounded-lg bg-indigo-600 text-white shadow-sm flex items-center gap-2 text-xs font-semibold"
+          >
+            <Menu className="w-5 h-5" /> Menu
+          </button>
+          <span className="font-bold text-sm tracking-tight">LogisticsHub</span>
+        </div>
+
+        {renderTabContent()}
+      </main>
     </div>
   );
 }
