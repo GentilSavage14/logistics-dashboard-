@@ -1,185 +1,115 @@
-import React, { useState } from 'react';
-import { Truck, User, CheckCircle2, AlertTriangle, Wrench } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../supabaseClient';
+import { Plus, Trash2 } from 'lucide-react';
 
-export default function Vehicles() {
-  const [vehicles, setVehicles] = useState([
-    { id: 'TRK-01', model: 'Volvo FH16', driver: 'John Doe', status: 'Active', fuel: '85%' },
-    { id: 'TRK-02', model: 'Freightliner Cascadia', driver: 'Sarah Smith', status: 'In Transit', fuel: '60%' },
-    { id: 'TRK-03', model: 'Isuzu NPR', driver: 'Mike Johnson', status: 'Maintenance', fuel: '20%' },
-    { id: 'TRK-04', model: 'Kenworth T680', driver: 'Alex Brown', status: 'Available', fuel: '100%' },
-  ]);
+export default function Vehicles({ darkMode, isAdmin }) {
+  const [vehicles, setVehicles] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [formData, setFormData] = useState({ id: '', driver: '', type: 'Semi Truck', status: 'Available' });
 
-  const [formData, setFormData] = useState({
-    id: '',
-    model: '',
-    driver: '',
-    status: 'Available'
-  });
+  useEffect(() => {
+    fetchVehicles();
+  }, []);
 
-  const activeVehicles = vehicles.filter(v => v.status === 'Active' || v.status === 'In Transit').length;
-  const inMaintenance = vehicles.filter(v => v.status === 'Maintenance').length;
-
-  const handleAddVehicle = (e) => {
-    e.preventDefault();
-    if (!formData.id || !formData.model) return;
-
-    const newVehicle = {
-      ...formData,
-      fuel: '100%'
-    };
-
-    setVehicles([newVehicle, ...vehicles]);
-    setFormData({ id: '', model: '', driver: '', status: 'Available' });
+  const fetchVehicles = async () => {
+    setLoading(true);
+    const { data, error } = await supabase.from('vehicles').select('*').order('created_at', { ascending: false });
+    if (!error) setVehicles(data || []);
+    setLoading(false);
   };
 
-  const getStatusBadge = (status) => {
-    switch (status) {
-      case 'Active':
-      case 'In Transit':
-        return 'bg-emerald-100 text-emerald-700';
-      case 'Available':
-        return 'bg-blue-100 text-blue-700';
-      case 'Maintenance':
-        return 'bg-rose-100 text-rose-700';
-      default:
-        return 'bg-gray-100 text-gray-700';
+  const handleAdd = async (e) => {
+    e.preventDefault();
+    if (!isAdmin) return;
+    const { error } = await supabase.from('vehicles').insert([formData]);
+    if (!error) {
+      fetchVehicles();
+      setFormData({ id: '', driver: '', type: 'Semi Truck', status: 'Available' });
     }
   };
+
+  const handleDelete = async (id) => {
+    if (!isAdmin || !window.confirm(`Delete vehicle ${id}?`)) return;
+    const { error } = await supabase.from('vehicles').delete().eq('id', id);
+    if (!error) fetchVehicles();
+  };
+
+  const cardBg = darkMode ? 'bg-slate-800 border-slate-700 text-white' : 'bg-white border-gray-100 text-gray-800';
+  const subText = darkMode ? 'text-slate-400' : 'text-gray-500';
+  const inputBg = darkMode ? 'bg-slate-700 border-slate-600 text-white placeholder-slate-400' : 'bg-white border-gray-200 text-gray-800';
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold text-gray-800">Fleet & Vehicles</h2>
-        <p className="text-gray-500">Monitor active trucks, drivers, and maintenance health.</p>
+        <h2 className={`text-2xl font-bold ${darkMode ? 'text-white' : 'text-gray-800'}`}>Fleet Vehicles</h2>
+        <p className={subText}>Track transport fleet and driver assignments.</p>
       </div>
 
-      {/* KPI Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase">Total Fleet</p>
-            <h3 className="text-2xl font-bold text-gray-800 mt-1">{vehicles.length} Units</h3>
-          </div>
-          <div className="p-3 bg-blue-100 rounded-lg text-blue-600">
-            <Truck className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase">On the Road</p>
-            <h3 className="text-2xl font-bold text-emerald-600 mt-1">{activeVehicles} Active</h3>
-          </div>
-          <div className="p-3 bg-emerald-100 rounded-lg text-emerald-600">
-            <CheckCircle2 className="w-6 h-6" />
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
-          <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase">In Maintenance</p>
-            <h3 className="text-2xl font-bold text-rose-600 mt-1">{inMaintenance} Units</h3>
-          </div>
-          <div className="p-3 bg-rose-100 rounded-lg text-rose-600">
-            <Wrench className="w-6 h-6" />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Vehicles Table */}
-        <div className="lg:col-span-2 bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-          <h3 className="font-bold text-gray-800 mb-4">Fleet Roster</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr className="border-b bg-gray-50 text-gray-500">
-                  <th className="p-3">Vehicle ID</th>
-                  <th className="p-3">Model</th>
-                  <th className="p-3">Assigned Driver</th>
-                  <th className="p-3">Fuel Level</th>
-                  <th className="p-3">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vehicles.map((v) => (
-                  <tr key={v.id} className="border-b hover:bg-gray-50">
-                    <td className="p-3 font-semibold text-gray-800">{v.id}</td>
-                    <td className="p-3 text-gray-600">{v.model}</td>
-                    <td className="p-3 text-gray-600 flex items-center gap-1.5 mt-1">
-                      <User className="w-3.5 h-3.5 text-gray-400" />
-                      {v.driver || 'Unassigned'}
-                    </td>
-                    <td className="p-3 font-medium text-gray-700">{v.fuel}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-1 text-xs rounded-full font-medium ${getStatusBadge(v.status)}`}>
-                        {v.status}
-                      </span>
-                    </td>
+      <div className={`grid grid-cols-1 ${isAdmin ? 'lg:grid-cols-3' : ''} gap-6`}>
+        <div className={`${isAdmin ? 'lg:col-span-2' : 'w-full'} p-5 rounded-xl border shadow-sm ${cardBg}`}>
+          <h3 className="font-bold mb-4">Fleet Status</h3>
+          {loading ? (
+            <p className={subText}>Loading vehicles...</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className={`border-b ${darkMode ? 'bg-slate-700/50 text-slate-300 border-slate-700' : 'bg-gray-50 text-gray-500 border-gray-100'}`}>
+                    <th className="p-3">Vehicle ID</th>
+                    <th className="p-3">Driver</th>
+                    <th className="p-3">Type</th>
+                    <th className="p-3">Status</th>
+                    {isAdmin && <th className="p-3 text-right">Actions</th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {vehicles.length === 0 ? (
+                    <tr><td colSpan={isAdmin ? 5 : 4} className={`p-4 text-center ${subText}`}>No vehicles found.</td></tr>
+                  ) : (
+                    vehicles.map((v) => (
+                      <tr key={v.id} className={`border-b ${darkMode ? 'border-slate-700' : 'border-gray-100'}`}>
+                        <td className="p-3 font-semibold">{v.id}</td>
+                        <td className="p-3 font-medium">{v.driver}</td>
+                        <td className={`p-3 ${subText}`}>{v.type}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 text-xs rounded-full font-medium ${v.status === 'Available' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {v.status}
+                          </span>
+                        </td>
+                        {isAdmin && (
+                          <td className="p-3 text-right">
+                            <button onClick={() => handleDelete(v.id)} className="text-red-600 hover:text-red-700 text-xs">
+                              <Trash2 className="w-4 h-4 inline" />
+                            </button>
+                          </td>
+                        )}
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
-        {/* Add Vehicle Form */}
-        <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
-          <h3 className="font-bold text-gray-800 mb-4">Add Fleet Unit</h3>
-          <form onSubmit={handleAddVehicle} className="space-y-3">
-            <div>
-              <label className="text-xs text-gray-500 font-semibold uppercase">Vehicle ID</label>
-              <input
-                type="text"
-                placeholder="e.g. TRK-05"
-                value={formData.id}
-                onChange={(e) => setFormData({ ...formData, id: e.target.value })}
-                className="w-full p-2 border rounded-lg text-sm mt-1"
-                required
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 font-semibold uppercase">Model</label>
-              <input
-                type="text"
-                placeholder="e.g. Volvo FH16"
-                value={formData.model}
-                onChange={(e) => setFormData({ ...formData, model: e.target.value })}
-                className="w-full p-2 border rounded-lg text-sm mt-1"
-                required
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 font-semibold uppercase">Driver Name</label>
-              <input
-                type="text"
-                placeholder="e.g. Sam Wilson"
-                value={formData.driver}
-                onChange={(e) => setFormData({ ...formData, driver: e.target.value })}
-                className="w-full p-2 border rounded-lg text-sm mt-1"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-gray-500 font-semibold uppercase">Status</label>
-              <select
-                value={formData.status}
-                onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                className="w-full p-2 border rounded-lg text-sm mt-1"
-              >
+        {isAdmin && (
+          <div className={`p-5 rounded-xl border shadow-sm ${cardBg}`}>
+            <h3 className="font-bold mb-4">Add Vehicle</h3>
+            <form onSubmit={handleAdd} className="space-y-3">
+              <input type="text" placeholder="Vehicle ID (e.g. TRK-01)" value={formData.id} onChange={(e) => setFormData({ ...formData, id: e.target.value })} className={`w-full p-2 border rounded-lg text-sm ${inputBg}`} required />
+              <input type="text" placeholder="Assigned Driver" value={formData.driver} onChange={(e) => setFormData({ ...formData, driver: e.target.value })} className={`w-full p-2 border rounded-lg text-sm ${inputBg}`} required />
+              <input type="text" placeholder="Vehicle Type (e.g. Cargo Van)" value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })} className={`w-full p-2 border rounded-lg text-sm ${inputBg}`} required />
+              <select value={formData.status} onChange={(e) => setFormData({ ...formData, status: e.target.value })} className={`w-full p-2 border rounded-lg text-sm ${inputBg}`}>
                 <option value="Available">Available</option>
-                <option value="Active">Active</option>
                 <option value="In Transit">In Transit</option>
                 <option value="Maintenance">Maintenance</option>
               </select>
-            </div>
-            <button
-              type="submit"
-              className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition mt-2"
-            >
-              Add Vehicle
-            </button>
-          </form>
-        </div>
+              <button type="submit" className="w-full bg-indigo-600 text-white py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition flex items-center justify-center gap-1">
+                <Plus className="w-4 h-4" /> Add Vehicle
+              </button>
+            </form>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -11,7 +11,7 @@ import Toast from './components/Toast';
 import { supabase } from './supabaseClient';
 import { LogOut, Menu, Check, X, ShieldCheck, Eye } from 'lucide-react';
 
-// Change or add admin emails here anytime!
+// Admin Email Whitelist
 const ADMIN_EMAILS = [
   'mainlyfortesting1@gmail.com'
 ];
@@ -65,10 +65,27 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  // Fetch shipments and listen for real-time updates
   useEffect(() => {
-    if (session) {
-      fetchShipments();
-    }
+    if (!session) return;
+
+    fetchShipments();
+
+    // Realtime Database Listener
+    const channel = supabase
+      .channel('realtime_shipments')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'shipments' },
+        () => {
+          fetchShipments(); // Re-fetch whenever rows change in Supabase
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [session]);
 
   const handleLogout = async () => {
@@ -91,6 +108,7 @@ export default function App() {
       .from('shipments')
       .select('*')
       .order('created_at', { ascending: false });
+
     if (error) {
       console.error('Error fetching shipments:', error);
       handleSupabaseError(error, 'fetching shipments');
@@ -114,7 +132,6 @@ export default function App() {
       handleSupabaseError(error, 'adding shipment');
     } else {
       showToast(`Shipment ${formData.id} added successfully!`, 'success');
-      fetchShipments();
       setFormData({ id: '', item: '', origin: '', destination: '', status: 'Pending' });
     }
   };
@@ -135,7 +152,6 @@ export default function App() {
       handleSupabaseError(error, 'updating status');
     } else {
       showToast(`Shipment ${id} marked as ${newStatus}`, 'success');
-      fetchShipments();
     }
   };
 
@@ -168,7 +184,6 @@ export default function App() {
     } else {
       showToast(`Shipment ${id} updated successfully!`, 'success');
       setEditingId(null);
-      fetchShipments();
     }
   };
 
@@ -188,7 +203,6 @@ export default function App() {
       handleSupabaseError(error, 'deleting shipment');
     } else {
       showToast(`Shipment ${id} deleted`, 'success');
-      fetchShipments();
     }
   };
 
@@ -468,9 +482,9 @@ export default function App() {
       );
     }
 
-    if (tab === 'invoices') return <Invoices darkMode={darkMode} />;
-    if (tab === 'customers') return <Customers darkMode={darkMode} />;
-    if (tab === 'vehicles') return <Vehicles darkMode={darkMode} />;
+    if (tab === 'invoices') return <Invoices darkMode={darkMode} isAdmin={isAdmin} />;
+    if (tab === 'customers') return <Customers darkMode={darkMode} isAdmin={isAdmin} />;
+    if (tab === 'vehicles') return <Vehicles darkMode={darkMode} isAdmin={isAdmin} />;
     if (tab === 'analytics') return <Analytics darkMode={darkMode} />;
     if (tab === 'settings') return <Settings darkMode={darkMode} setDarkMode={setDarkMode} />;
 
